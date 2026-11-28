@@ -1,0 +1,49 @@
+// POSLO ONE prava (nativna) Android aplikacija: vlastiti WebView, bez preglednika i adresne trake.
+// Isti paket i isti ključ kao TWA verzija, pa testeri dobijaju običnu nadogradnju.
+plugins {
+    id 'com.android.application'
+}
+
+def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1') as Integer
+
+android {
+    namespace 'one.poslo.app'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'one.poslo.app'
+        minSdk 24
+        targetSdk 36
+        versionCode 1000 + runNumber
+        versionName "2.0.${runNumber}"
+    }
+
+    def ks = file('upload.jks')
+    signingConfigs {
+        release {
+            if (ks.exists()) {
+                storeFile ks
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias 'poslo-upload'
+                keyPassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (ks.exists()) signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
+    implementation 'androidx.browser:browser:1.8.0'
+}
