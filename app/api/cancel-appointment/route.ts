@@ -120,28 +120,7 @@ export async function POST(request: NextRequest) {
 
         const displayDate = formatToBalkanDate(reservation.date) || reservation.date;
 
-        // ---------- TELEGRAM ----------
-        try {
-            const token = process.env.TELEGRAM_BOT_TOKEN;
-            const chatId = reservation.telegramChatId || process.env.TELEGRAM_CHAT_ID;
-            if (token && chatId) {
-                const telegramMessage = "OTKAZAN TERMIN!" + "\n\n" +
-                    "Biznis: " + reservation.partnerName + "\n" +
-                    "Paket: " + reservation.packageName + " (" + reservation.price + ")" + "\n" +
-                    "Datum: " + displayDate + " u " + reservation.time + "\n\n" +
-                    "Klijent: " + reservation.clientName + "\n" +
-                    "Telefon: " + reservation.clientPhone + "\n" +
-                    "Email: " + (reservation.clientEmail || 'Nije naveden');
-
-                await fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ chat_id: chatId, text: telegramMessage }),
-                });
-            }
-        } catch (tgErr) {
-            console.log("Telegram za otkazivanje nije poslan:", tgErr);
-        }
+        // Telegram je samo za administratora (nove firme i kontakt forma), ne za rezervacije.
 
         // ---------- EMAIL (Resend) ----------
         try {
