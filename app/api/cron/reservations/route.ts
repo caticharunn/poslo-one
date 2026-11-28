@@ -4,6 +4,7 @@ import { timingSafeEqual } from 'crypto';
 import { runReservationLifecycle } from '../../../../utils/reservationRules';
 import { processRebookReminders } from '../../../../utils/growthEmails';
 import { retryFetch } from '../../../../utils/supabaseRetryFetch';
+import { sendNativeToUsers } from '../../../../utils/fcm';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,14 +42,24 @@ export async function GET(request: NextRequest) {
     const summary = await runReservationLifecycle(admin, Date.now(), async (row) => {
       const apiKey = process.env.RESEND_API_KEY;
       const to = typeof row.customer_email === 'string' ? row.customer_email : '';
-      if (!apiKey || !to) return false; // bez email servisa ništa se ne šalje i oznaka se vraća
       let name = row.business_id ? businessNames.get(row.business_id) : undefined;
       if (!name && row.business_id) {
         const { data } = await admin.from('businesses').select('name').eq('id', row.business_id).maybeSingle();
         name = data?.name || '';
         businessNames.set(row.business_id, name || '');
       }
+      const uid = typeof (row as { user_id?: unknown }).user_id === 'string' ? String((row as { user_id?: unknown }).user_id) : '';
+      let nativeSent = 0;
+      if (uid) {
+        nativeSent = (await sendNativeToUsers(admin, [uid], {
+          title: 'Podsjetnik: termin sutra',
+          body: String(row.service_name || 'Termin') + (name ? ' kod ' + name : '') + ', ' + formatDate(String(row.reservation_date || '')),
+          url: 'https://poslo.one/termini',
+        })).sent;
+      }
+      if (!apiKey || !to) return nativeSent > 0;
       const { Resend } = await import('resend');
+
       const resend = new Resend(apiKey);
       const when = formatDate(String(row.reservation_date || ''));
       const result = await resend.emails.send({

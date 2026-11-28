@@ -136,7 +136,7 @@ export async function runReservationLifecycle(admin: SupabaseClient, nowMs: numb
   for (let offset = 0; ; offset += pageSize) {
     const { data, error } = await admin
       .from('reservations')
-      .select('id, business_id, status, reservation_date, created_at, reminder_sent_at, customer_email, customer_name, service_name')
+      .select('id, business_id, user_id, status, reservation_date, created_at, reminder_sent_at, customer_email, customer_name, service_name')
       .order('created_at', { ascending: true })
       .range(offset, offset + pageSize - 1);
     if (error) throw error;

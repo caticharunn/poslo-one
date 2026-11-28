@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "251389429062",
+    "project_id": "poslo-one",
+    "storage_bucket": "poslo-one.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:251389429062:android:63d499b2a9fd29a7e15147",
+        "android_client_info": {
+          "package_name": "one.poslo.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBPY8JKOusSX7YRhw85ZTvBFpPx_ENfNUA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

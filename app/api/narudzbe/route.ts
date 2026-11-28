@@ -9,6 +9,7 @@ import { categoryOf } from '../../../utils/catalog';
 import { CHECK_OUT_TIME, isStayCategory, nightsOf, planStay } from '../../../utils/stay';
 import { retryFetch } from '../../../utils/supabaseRetryFetch';
 import { isDemoBlocked, DEMO_BLOCK_MESSAGE } from '../../../utils/demoAccount';
+import { sendNativeToUsers } from '../../../utils/fcm';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'missing-service-role-key';
@@ -240,6 +241,13 @@ export async function POST(request: NextRequest) {
                 when: displayDate + ' ' + time,
             }));
         }
+
+        // Prava obavijest klijentu u aplikaciji (uz e-mail).
+        await sendNativeToUsers(supabase, [authData.user.id], {
+            title: autoConfirm ? 'Termin je zakazan ✅' : 'Zahtjev za termin je poslan',
+            body: packageName + ' kod ' + partnerName + ', ' + displayDate + (time ? ' u ' + time : ''),
+            url: 'https://poslo.one/termini',
+        });
 
         // Telegram je samo za administratora (nove firme i kontakt forma), ne za rezervacije.
 

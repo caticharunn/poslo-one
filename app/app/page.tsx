@@ -6,6 +6,15 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useT } from '../../components/site/LangProvider';
+import { isNativeApp, nativePushStatus, requestNativePush } from '../../utils/nativePush';
+
+const wantsNotify = () => {
+  try {
+    return isNativeApp() && nativePushStatus() === 'default' && localStorage.getItem('poslo_notify_later') !== '1';
+  } catch {
+    return false;
+  }
+};
 
 // Početni ekran aplikacije (start_url). Nastavlja se na Android splash: isti logo, ista veličina, ista pozadina.
 // Prijavljen korisnik ide na Početnu; neprijavljen prvi put vidi uvod (3 slajda), a poslije uvijek samo prijavu.
@@ -40,6 +49,10 @@ const TEXT = {
     owner: 'Imaš firmu?',
     register: 'Registruj je besplatno',
     googleError: 'Prijava s Googleom nije uspjela. Pokušaj ponovo.',
+    notifyTitle: 'Uključi obavijesti',
+    notifySub: 'Javit ćemo ti kad je termin potvrđen i podsjetiti te dan prije. Ako imaš firmu, odmah saznaš za svaku novu rezervaciju.',
+    notifyAllow: 'Dozvoli obavijesti',
+    notifyLater: 'Ne sada',
   },
   en: {
     skip: 'Skip',
@@ -63,10 +76,14 @@ const TEXT = {
     owner: 'Own a business?',
     register: 'Register it for free',
     googleError: 'Google sign-in failed. Please try again.',
+    notifyTitle: 'Turn on notifications',
+    notifySub: 'We let you know when a booking is confirmed and remind you a day before. Business owners hear about every new booking right away.',
+    notifyAllow: 'Allow notifications',
+    notifyLater: 'Not now',
   },
 };
 
-type Stage = 'logo' | 'intro' | 'login';
+type Stage = 'logo' | 'intro' | 'notify' | 'login';
 
 const CAT_COLORS = ['#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#f97316'];
 
@@ -107,15 +124,21 @@ export default function AppStart() {
         const { data: { session } } = await supabase.auth.getSession();
         signedIn = Boolean(session);
       } catch {}
+      const askNotify = wantsNotify();
       if (signedIn) {
-        after(() => router.replace('/'));
+        after(() => {
+          if (askNotify) {
+            afterNotify.current = '/';
+            setStage('notify');
+          } else router.replace('/');
+        });
         return;
       }
       let seen = false;
       try {
         seen = localStorage.getItem(INTRO_KEY) === '1';
       } catch {}
-      after(() => setStage(seen ? 'login' : 'intro'));
+      after(() => setStage(seen ? (askNotify ? 'notify' : 'login') : 'intro'));
     })();
     return () => {
       cancelled = true;
@@ -126,7 +149,20 @@ export default function AppStart() {
     try {
       localStorage.setItem(INTRO_KEY, '1');
     } catch {}
-    setStage('login');
+    setStage(wantsNotify() ? 'notify' : 'login');
+  };
+
+  const afterNotify = useRef<string | null>(null);
+  const doneNotify = async (allow: boolean) => {
+    if (allow) await requestNativePush();
+    else {
+      try {
+        // Pamti odgovor da se ekran ne pokazuje ponovo; uključiti se može kasnije u postavkama telefona.
+        localStorage.setItem('poslo_notify_later', '1');
+      } catch {}
+    }
+    if (afterNotify.current) router.replace(afterNotify.current);
+    else setStage('login');
   };
 
   const nextSlide = () => (slide < 2 ? setSlide(slide + 1) : finishIntro());
@@ -256,6 +292,30 @@ export default function AppStart() {
           <div className="px-6 pt-8">
             <button type="button" onClick={nextSlide} className="app-press h-14 w-full rounded-2xl bg-blue-600 text-[16px] font-bold shadow-lg shadow-blue-600/30">
               {slide < 2 ? t.next : t.start}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {stage === 'notify' && (
+        <div className="app-fade relative z-10 flex min-h-[100dvh] flex-col items-center px-7 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[env(safe-area-inset-top)]">
+          <div className="flex flex-1 flex-col items-center justify-center text-center">
+            <div className="relative mb-8 flex h-28 w-28 items-center justify-center rounded-[32px] bg-blue-600/15 ring-1 ring-blue-500/30">
+              <svg viewBox="0 0 24 24" className="h-14 w-14 text-blue-400" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+              </svg>
+              <span className="absolute -right-1 -top-1 h-5 w-5 rounded-full bg-red-500 ring-4 ring-[#030712]" />
+            </div>
+            <h2 className="text-[30px] font-black leading-tight tracking-tight">{t.notifyTitle}</h2>
+            <p className="mt-3 max-w-[320px] text-[15px] leading-relaxed text-slate-400">{t.notifySub}</p>
+          </div>
+          <div className="w-full space-y-3">
+            <button type="button" onClick={() => doneNotify(true)} className="app-press h-14 w-full rounded-2xl bg-blue-600 text-[16px] font-bold shadow-lg shadow-blue-600/30">
+              {t.notifyAllow}
+            </button>
+            <button type="button" onClick={() => doneNotify(false)} className="h-12 w-full text-[15px] font-semibold text-slate-400">
+              {t.notifyLater}
             </button>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Resend } from 'resend';
 import { buildInquiryPayload, sendPushToBusiness, type PushStore } from '../../../utils/push';
 import { isPushConfigured, sendWebPush } from '../../../utils/pushSender';
+import { sendNativeToBusiness } from '../../../utils/fcm';
 import { retryFetch } from '../../../utils/supabaseRetryFetch';
 import { isDemoBlocked, DEMO_BLOCK_MESSAGE } from '../../../utils/demoAccount';
 
@@ -145,7 +146,11 @@ export async function POST(request: NextRequest) {
       .single();
     if (saveError || !saved) {
       console.error('business-inquiry: upit nije sačuvan:', saveError);
-    } else if (isPushConfigured()) {
+    } else {
+      const p = buildInquiryPayload({ inquiryId: saved.id, service });
+      await sendNativeToBusiness(admin, business.id, { title: p.title, body: p.body, url: p.url });
+    }
+    if (saved && isPushConfigured()) {
       const result = await sendPushToBusiness(
         admin as unknown as PushStore,
         business.id,
