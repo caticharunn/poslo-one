@@ -1,5 +1,6 @@
 import webpush from 'web-push';
 import { sendPushToBusiness, type PushPayload, type PushSender, type PushStore } from './push';
+import { sendNativeToBusiness } from './fcm';
 
 export function isPushConfigured() {
   return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT);
@@ -20,7 +21,10 @@ export const sendWebPush: PushSender = async (subscription, payload) => {
 
 // Šalje push svim pretplatama JEDNE firme (business_id). Greške ne smiju prekinuti glavni tok.
 export async function notifyBusinessPush(admin: unknown, businessId: string, payload: PushPayload) {
-  if (!isPushConfigured() || !businessId) return null;
+  if (!businessId) return null;
+  // Android aplikacija (prave obavijesti); web push ide odvojeno ispod.
+  await sendNativeToBusiness(admin as PushStore, businessId, { title: payload.title, body: payload.body, url: payload.url });
+  if (!isPushConfigured()) return null;
   try {
     return await sendPushToBusiness(admin as PushStore, businessId, payload, sendWebPush);
   } catch (error) {

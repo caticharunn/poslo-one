@@ -11,6 +11,7 @@ import CookieBanner from '../CookieBanner';
 import AppChrome from '../app/AppChrome';
 
 import { GENERAL_SUBJECT, SiteContext } from './siteContext';
+import { refreshNativePush, syncNativeToken } from '../../utils/nativePush';
 
 // Meni, pozadina i kontakt žive ovdje, iznad stranica, pa se ne učitavaju ponovo pri svakom prelazu.
 
@@ -33,6 +34,13 @@ export default function SiteShell({ children }: { children: ReactNode }) {
       window.removeEventListener('pageshow', apply);
       document.removeEventListener('visibilitychange', apply);
     };
+  }, [pathname]);
+  // Android aplikacija: token za obavijesti se osvježi pri pokretanju i veže za korisnika nakon prijave.
+  useEffect(() => {
+    refreshNativePush();
+  }, []);
+  useEffect(() => {
+    void syncNativeToken();
   }, [pathname]);
   const chrome = hasChrome(pathname);
   const [contactOpen, setContactOpen] = useState(false);

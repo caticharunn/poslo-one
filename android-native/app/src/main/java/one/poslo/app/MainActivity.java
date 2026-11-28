@@ -1,6 +1,13 @@
 package one.poslo.app;
 
+import android.Manifest;
 import android.annotation.SuppressLint;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.os.Build;
+import android.webkit.JavascriptInterface;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
@@ -26,6 +33,8 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.google.firebase.messaging.FirebaseMessaging;
+
 /**
  * POSLO ONE: vlastiti WebView koji prikazuje poslo.one bez preglednika i adresne trake.
  * - poslo.one ostaje u aplikaciji; ostali linkovi idu u preglednik ili odgovarajuću aplikaciju
@@ -38,6 +47,7 @@ public class MainActivity extends Activity {
     private static final String SUPABASE_HOST = "qpptpbjksrqfqjunggrq.supabase.co";
     private static final int BG = Color.parseColor("#030712");
     private static final int FILE_REQUEST = 41;
+    private static final int PUSH_REQUEST = 42;
 
     private WebView web;
     private ValueCallback<Uri[]> fileCallback;
@@ -75,6 +85,8 @@ public class MainActivity extends Activity {
 
         web.setWebViewClient(new Client());
         web.setWebChromeClient(new Chrome());
+        web.addJavascriptInterface(new Bridge(), "PosloNative");
+        ensureChannel(this);
         web.setDownloadListener((url, ua, cd, mime, len) -> openExternal(Uri.parse(url)));
 
         if (savedInstanceState != null) web.restoreState(savedInstanceState);
@@ -89,7 +101,13 @@ public class MainActivity extends Activity {
 
     /** Povratak s Google prijave ili otvaranje poslo.one linka u aplikaciji. */
     private boolean handleIntent(Intent intent) {
-        Uri data = intent == null ? null : intent.getData();
+        if (intent == null) return false;
+        String pushUrl = intent.getStringExtra("url");
+        if (pushUrl != null && pushUrl.startsWith("https://" + HOST + "/")) {
+            web.loadUrl(pushUrl);
+            return true;
+        }
+        Uri data = intent.getData();
         if (data == null) return false;
         if ("one.poslo.app".equals(data.getScheme()) && "auth".equals(data.getHost())) {
             String rest = data.getQueryParameter("u");
@@ -234,6 +252,62 @@ public class MainActivity extends Activity {
     protected void onSaveInstanceState(Bundle out) {
         super.onSaveInstanceState(out);
         web.saveState(out);
+    }
+
+
+    static void ensureChannel(Context ctx) {
+        if (Build.VERSION.SDK_INT < 26) return;
+        NotificationManager nm = (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm == null || nm.getNotificationChannel("poslo") != null) return;
+        NotificationChannel ch = new NotificationChannel("poslo", "Termini i obavijesti", NotificationManager.IMPORTANCE_HIGH);
+        ch.setDescription("Potvrde termina, podsjetnici i nove rezervacije");
+        nm.createNotificationChannel(ch);
+    }
+
+    private boolean pushAllowed() {
+        if (Build.VERSION.SDK_INT >= 33) return checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+        return ((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).areNotificationsEnabled();
+    }
+
+    /** Javlja stranici: dozvola + token uređaja. */
+    private void deliverToken() {
+        final boolean ok = pushAllowed();
+        FirebaseMessaging.getInstance().getToken().addOnCompleteListener(t -> {
+            String token = t.isSuccessful() && t.getResult() != null ? t.getResult() : "";
+            String js = "window.__posloPushResult&&window.__posloPushResult(" + ok + ",'" + token.replace("'", "") + "')";
+            runOnUiThread(() -> web.evaluateJavascript(js, null));
+        });
+    }
+
+    private class Bridge {
+        @JavascriptInterface
+        public String pushStatus() {
+            if (pushAllowed()) return "granted";
+            return getSharedPreferences("poslo", Context.MODE_PRIVATE).getBoolean("asked", false) ? "denied" : "default";
+        }
+
+        @JavascriptInterface
+        public void requestPush() {
+            runOnUiThread(() -> {
+                getSharedPreferences("poslo", Context.MODE_PRIVATE).edit().putBoolean("asked", true).apply();
+                if (Build.VERSION.SDK_INT >= 33 && !pushAllowed()) {
+                    requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, PUSH_REQUEST);
+                } else {
+                    deliverToken();
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void refreshToken() {
+            if (pushAllowed()) deliverToken();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        super.onRequestPermissionsResult(requestCode, permissions, results);
+        if (requestCode == PUSH_REQUEST) deliverToken();
     }
 
     private static final String OFFLINE_HTML =

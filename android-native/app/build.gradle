@@ -2,6 +2,7 @@
 // Isti paket i isti ključ kao TWA verzija, pa testeri dobijaju običnu nadogradnju.
 plugins {
     id 'com.android.application'
+    id 'com.google.gms.google-services'
 }
 
 def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1') as Integer
@@ -46,4 +47,6 @@ android {
 dependencies {
     implementation 'androidx.core:core:1.13.1'
     implementation 'androidx.browser:browser:1.8.0'
+    implementation platform('com.google.firebase:firebase-bom:33.7.0')
+    implementation 'com.google.firebase:firebase-messaging'
 }
