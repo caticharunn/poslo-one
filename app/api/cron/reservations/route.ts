@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
         })).sent;
       }
       if (!apiKey || !to) return nativeSent > 0;
+      const { Resend } = await import('resend');
 
       const resend = new Resend(apiKey);
       const when = formatDate(String(row.reservation_date || ''));
