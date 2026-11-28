@@ -241,23 +241,7 @@ export async function POST(request: NextRequest) {
             }));
         }
 
-        // ---------- TELEGRAM ----------
-        try {
-            const token = process.env.TELEGRAM_BOT_TOKEN;
-            const chatId = business.telegram_chat_id || process.env.TELEGRAM_CHAT_ID;
-            if (token && chatId) {
-                const vehicleLine = vehicle ? ('\nVozilo: ' + vehicle) : '';
-                const telegramMessage = (autoConfirm ? "NOVA REZERVACIJA (potvrđena)" : "NOVI ZAHTJEV (potvrdite u panelu)") + "\n\nBiznis: " + partnerName + "\nPaket: " + packageName + " (" + price + ")" + (stayPlan ? "\nBoravak: " + stayText : "\nDatum: " + displayDate + " u " + time + " (traje " + durationMinutes + " min)") + vehicleLine + "\n\nKlijent: " + clientName + "\nTelefon: " + clientPhone + "\nEmail: " + (clientEmail || 'Nije naveden');
-
-                await fetch("https://api.telegram.org/bot" + token + "/sendMessage", {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ chat_id: chatId, text: telegramMessage }),
-                });
-            }
-        } catch (tgErr) {
-            console.error("Telegram greska:", tgErr);
-        }
+        // Telegram je samo za administratora (nove firme i kontakt forma), ne za rezervacije.
 
         // ---------- EMAIL (Resend) ----------
         try {
